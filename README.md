@@ -17,14 +17,14 @@ Some of the issues with the existing test and resources are,
 
 ## Requirements
 
-This has been tested under OS X, Python 2, and poppler 0.34.0.  Beautiful Soup, natsort and Poppler's pdftohtml are required.
+This has been tested under OS X, Python 3, and poppler 0.34.0.  Beautiful Soup, natsort and Poppler's pdftohtml are required.
 
 ## How to use
 
 The basic way to run the program is
 
 ```
-python convert.py -f <path-to-pdf> [-a <path-to-anki-media-folder>] [-w working-directory]
+python3 convert.py -f <path-to-pdf> [-a <path-to-anki-media-folder>] [-w working-directory]
 ```
 
 The code will create a .csv file in the working directory, or the current one if not specified.  With the -a argument given, if the PDF contains images, they will be copied to the anki media folder, and inserted into the front of the question cards.
