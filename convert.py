@@ -5,7 +5,7 @@ from functools import wraps
 import inspect
 from copy import deepcopy
 from bs4 import BeautifulSoup
-from os.path import basename,dirname,splitext
+from os.path import basename,dirname,splitext,isfile,join
 from shutil import copy2
 from subprocess import call
 import os,argparse,errno
@@ -27,7 +27,8 @@ def main():
   parser.add_argument('-l', '--language', required=False)
   parser.add_argument('-t', '--truechoice', required=False)
   parser.add_argument('-a', '--anki', required=False) ## path to anki media folder.  if set, copy images here
-  parser.add_argument('-w', '--working', required=False, default='./') ## working directory, where output files will be stored.  Defaults to ./
+  parser.add_argument('-w', '--working', required=False, default='./')
+  parser.add_argument('-o', '--overwrite', required=False, action='store_true')
   args = parser.parse_args()
 
   filename = splitext(basename(args.file))
@@ -44,6 +45,10 @@ def main():
   workingDir = args.working + '/' + qfile.getFileID()
   mkdir_p(workingDir)
 
+  outputFile = join(args.working,qfile.getFileID()+'.csv')
+  if not args.overwrite and isfile(outputFile):
+    print("%s exists" % (outputFile))
+    sys.exit()
   if ext == '.pdf':
     xmlfile = workingDir + '/' + base + '.xml'
     opts = ['pdftohtml', '-xml']
@@ -155,18 +160,18 @@ def initializer(func):
 class QuestionFile(object):
   global filemap
   filemap = {
-              '機車法規是非題-中文' : ('motorcycle', 'rules', 'true','chinese'),
-              '機車法規選擇題-中文' : ('motorcycle', 'rules', 'choice', 'chinese'),
-              '機車標誌是非題-中文' : ('motorcycle', 'signs', 'true','chinese'),
-              '機車標誌選擇題-中文' : ('motorcycle', 'signs', 'choice','chinese'),
+              '機車法規是非題-中文' : ('moto', 'rules', 'true','chinese'),
+              '機車法規選擇題-中文' : ('moto', 'rules', 'choice', 'chinese'),
+              '機車標誌是非題-中文' : ('moto', 'signs', 'true','chinese'),
+              '機車標誌選擇題-中文' : ('moto', 'signs', 'choice','chinese'),
               '汽車標誌是非題-中文' : ('car', 'signs', 'true', 'chinese'),
               '汽車標誌選擇題-中文' : ('car', 'signs', 'choice', 'chinese'),
               '汽車法規是非題-中文' : ('car', 'rules', 'true', 'chinese'),
               '汽車法規選擇題-中文' : ('car', 'rules', 'choice', 'chinese'),
-              'Rules-True or False／English〈機車法規是非題-英文〉' : ('motorcycle', 'rules', 'true', 'english'),
-              'Rules-Choice／English〈機車法規選擇題-英文〉' : ('motorcycle', 'rules', 'choice', 'english'),
-              'Signs-True or False／English〈機車標誌是非題-英文〉' : ('motorcycle', 'signs', 'true', 'english'),
-              'Signs-Choice／English〈機車標誌選擇題-英文〉' : ('motorcycle', 'signs', 'choice', 'english'),
+              'Rules-True or False／English〈機車法規是非題-英文〉' : ('moto', 'rules', 'true', 'english'),
+              'Rules-Choice／English〈機車法規選擇題-英文〉' : ('moto', 'rules', 'choice', 'english'),
+              'Signs-True or False／English〈機車標誌是非題-英文〉' : ('moto', 'signs', 'true', 'english'),
+              'Signs-Choice／English〈機車標誌選擇題-英文〉' : ('moto', 'signs', 'choice', 'english'),
               'Rules-Choice／English(汽車法規選擇題-英文)' : ('car', 'rules', 'choice', 'english'),
               'Rules-True or False／English(汽車法規是非題-英文)' : ('car', 'rules', 'true', 'english'),
               'Signs-Choice／English(汽車標誌選擇題-英文)' : ('car', 'signs', 'choice', 'english'),
