@@ -25,27 +25,24 @@ def main():
   #parser.add_argument('-t', '--type', required=False) ## scooter or car
   #parser.add_argument('-l', '--lang', required=False) ## [eng|chn|...]
   #parser.add_argument('-q', '--qualifier', required=True) ## [signs|rules]-[choice|true]
-  parser.add_argument('-c', '--copy', action='store_true') ## copy images or not
-  parser.add_argument('-a', '--anki', required=False) ## path to anki media folder
+  parser.add_argument('-a', '--anki', required=False) ## path to anki media folder.  if set, copy images here
   parser.add_argument('-w', '--working', required=False, default='./') ## working directory, where output files will be stored.  Defaults to ./
   args = parser.parse_args()
-
-  if args.copy and not args.anki:
-    warning("copy [-c] is set but anki media folder option [-a folder] is not set")
-    sys.exit()
 
   filename = splitext(basename(args.file))
   base = filename[0]
   ext = filename[1]
   xmlfile = args.file
 
-  workingDir = args.working + '/' + base
+  qfile = theqfile(filebase=base)
+
+  workingDir = args.working + '/' + qfile.type.getFileID()
   mkdir_p(workingDir)
 
   if ext == '.pdf':
     xmlfile = workingDir + '/' + base + '.xml'
     opts = ['pdftohtml', '-xml']
-    if not args.copy:
+    if not args.anki:
       opts.append('-i')
     opts.extend([args.file, xmlfile])
     FNULL = open(os.devnull, 'w')
@@ -57,11 +54,6 @@ def main():
   filehandler = open(xmlfile)
 
   soup = BeautifulSoup(filehandler,'lxml')
-
-  qfile = theqfile(filebase=base)
-
-  if args.copy:
-    qfile.copyImages(workingDir, args.anki)
 
   current_q = qfile.newQuestion()
 
@@ -79,6 +71,8 @@ def main():
                       '^分類$',
                       '^編號$',
                       '^機車法規是非題$',
+                      '^汽車法規選擇題$',
+                      '^【英文】$',
                     ]
 
 
@@ -109,7 +103,6 @@ def main():
         qnum_i = qnum-1
         if current_q:
           current_q.question = re.sub('\n','',current_q.question)
-          #print(current_q.pretty())
           current_q = qfile.newQuestion()
         current_q.number = qnum
         continue
@@ -130,6 +123,9 @@ def main():
   filehandler.close()
 
   qfile.writeCSV(args.working)
+  if args.anki:
+    qfile.copyImages(workingDir, args.anki)
+
 
 
 
@@ -152,22 +148,28 @@ def initializer(func):
 
 class qfiletype(object):
   @initializer
-  def __init__(self, vehicle='', signsrules='', qtype='',language=''):
+  def __init__(self, vehicle='', signsrules='', truechoice='',language=''):
     pass
   def getFileID(self):
-    return self.language+'-'+self.vehicle+'-'+self.signsrules+'-'+self.qtype
+    return self.language+'-'+self.vehicle+'-'+self.signsrules+'-'+self.truechoice
+  def getAttributes(self):
+    return (self.language, self.vehicle, self.signsrules, self.truechoice)
 
 class theqfile(object):
   global filemap
   filemap = {
-              '機車法規是非題-中文' : qfiletype('moto', 'rules', 'true','chinese'),
-              '機車法規選擇題-中文' : qfiletype('moto', 'rules', 'choice', 'chinese'),
-              '機車標誌是非題-中文' : qfiletype('moto', 'signs', 'true','chinese'),
-              '機車標誌選擇題-中文' : qfiletype('moto', 'signs', 'choice','chinese'),
-              'Rules-True or False／English〈機車法規是非題-英文〉' : qfiletype('moto', 'rules', 'true', 'english'),
-              'Rules-Choice／English〈機車法規選擇題-英文〉' : qfiletype('moto', 'rules', 'choice', 'english'),
-              'Signs-True or False／English〈機車標誌是非題-英文〉' : qfiletype('moto', 'signs', 'true', 'english'),
-              'Signs-Choice／English〈機車標誌選擇題-英文〉' : qfiletype('moto', 'signs', 'choice', 'english'),
+              '機車法規是非題-中文' : qfiletype('motorcycle', 'rules', 'true','chinese'),
+              '機車法規選擇題-中文' : qfiletype('motorcycle', 'rules', 'choice', 'chinese'),
+              '機車標誌是非題-中文' : qfiletype('motorcycle', 'signs', 'true','chinese'),
+              '機車標誌選擇題-中文' : qfiletype('motorcycle', 'signs', 'choice','chinese'),
+              'Rules-True or False／English〈機車法規是非題-英文〉' : qfiletype('motorcycle', 'rules', 'true', 'english'),
+              'Rules-Choice／English〈機車法規選擇題-英文〉' : qfiletype('motorcycle', 'rules', 'choice', 'english'),
+              'Signs-True or False／English〈機車標誌是非題-英文〉' : qfiletype('motorcycle', 'signs', 'true', 'english'),
+              'Signs-Choice／English〈機車標誌選擇題-英文〉' : qfiletype('motorcycle', 'signs', 'choice', 'english'),
+              'Rules-Choice／English(汽車法規選擇題-英文)' : qfiletype('car', 'rules', 'choice', 'english'),
+              'Rules-True or False／English(汽車法規是非題-英文)' : qfiletype('car', 'rules', 'true', 'english'),
+              'Signs-Choice／English(汽車標誌選擇題-英文)' : qfiletype('car', 'signs', 'choice', 'english'),
+              'Signs-True or False／English(汽車標誌是非題-英文)' : qfiletype('car', 'signs', 'true', 'english'),
             }
 
   @initializer
@@ -182,6 +184,7 @@ class theqfile(object):
       warning('qfile(): language not set')
     if not self.type:
       warning('qfile(): type not set')
+      sys.exit()
   def newQuestion(self):
     q = question(qfile=self)
     self.questions.append(q)
@@ -201,18 +204,24 @@ class theqfile(object):
     lastq = self.questions[-1]
     if not lastq:
       del self.questions[-1]
-    if self.images:
+    if self.type.signsrules == 'signs':
+      self.populateImageNames()
       for i,q in enumerate(self.questions):
         q.question = '<img src="'+self.images[i]+'"><br>'+q.question
+    self.finished_called = 1
   def copyImages(self, work, anki):
-    newbase = self.type.getFileID()
+    if not self.finished_called:
+      self.finished()
     images = glob.glob(work + '/' + self.filebase + '*png')
-    self.images = []
     for i,f in enumerate(natsorted(images)):
+      copy2(f, anki + '/' + self.images[i])
+  def populateImageNames(self):
+    self.images = []
+    newbase = self.type.getFileID()
+    for i,q in enumerate(self.questions):
       qnum = i+1
-      outfile = newbase+'-'+str(qnum)+'.png'
-      self.images.append(outfile)
-      copy2(f, anki + '/' + outfile)
+      imagefile = newbase+'-'+str(qnum)+'.png'
+      self.images.append(imagefile)
 
 class question(object):
   @initializer
@@ -237,8 +246,12 @@ class question(object):
   def pretty(self):
     if not self.number or not self.question or not self.answer:
       warning("pretty(): Number, question or answer not set before printing")
-    pretty_question = re.sub(r'\( *([123]) *\)',r'<br>(\1) ',self.question)
-    return '\t'.join((self.qfile.type.getFileID()+'-'+str(self.number).zfill(3),pretty_question,self.answer,self.category)).encode('utf-8')
+    pretty_question = self.question
+    if self.qfile.type.truechoice == 'choice':
+      pretty_question = re.sub(r'\( *([123]) *\)',r'<br>(\1) ',self.question)
+    row = [self.qfile.type.getFileID()+'-'+str(self.number).zfill(3),pretty_question,self.answer,self.category]
+    row.extend(self.qfile.type.getAttributes())
+    return '\t'.join(row).encode('utf-8')
 
 def warning(*objs):
   print("WARNING: ", *objs, file=sys.stderr)

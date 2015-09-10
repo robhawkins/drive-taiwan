@@ -17,7 +17,7 @@ Some of the issues with the existing test and resources are,
 
 ## Requirements
 
-This has been tested under OS X, Python 2, and poppler 0.34.0.  Beautiful Soup and Poppler's pdftohtml are required.
+This has been tested under OS X, Python 2, and poppler 0.34.0.  Beautiful Soup, natsort and Poppler's pdftohtml are required.
 
 ## How to use
 
