@@ -24,10 +24,10 @@ This has been tested under OS X, Python 2, and poppler 0.34.0.  Beautiful Soup, 
 The basic way to run the program is
 
 ```
-python convert.py -f <path-to-pdf> -c -a <path-to-anki-media-folder> [-w working-directory]
+python convert.py -f <path-to-pdf> [-a <path-to-anki-media-folder>] [-w working-directory]
 ```
 
-The code will create a .csv file in the working directory, or the current one if not specified.  With the -c argument given, if the PDF contains images, they will be copied to the anki media folder, and inserted into the front of the question cards.
+The code will create a .csv file in the working directory, or the current one if not specified.  With the -a argument given, if the PDF contains images, they will be copied to the anki media folder, and inserted into the front of the question cards.
 
 Then, import this CSV into an Anki deck
 
