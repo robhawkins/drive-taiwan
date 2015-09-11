@@ -1,12 +1,11 @@
 #encoding: UTF-8
 
-
 from functools import wraps
 import inspect
 from copy import deepcopy
 from bs4 import BeautifulSoup
 from os.path import basename,dirname,splitext,isfile,join
-from shutil import copy2
+from shutil import copy2,rmtree
 from subprocess import call
 import os,argparse,errno
 import sys
@@ -17,18 +16,20 @@ from natsort import natsorted
 
 ## This program converts Taiwan driver's test PDF files into csv for import as Anki flashcards. It can optionally copy images to Anki media folder
 
-##TODO : make use of optional arguments to override setting of options based on filename: scooter/car, language, signs/rules
 
 def main():
+  scriptDir=os.path.dirname(os.path.realpath(__file__))
   parser = argparse.ArgumentParser()
-  parser.add_argument('-f', '--file', required=True)
-  parser.add_argument('-v', '--vehicle', required=False)
-  parser.add_argument('-s', '--signsrules', required=False)
-  parser.add_argument('-l', '--language', required=False)
-  parser.add_argument('-t', '--truechoice', required=False)
-  parser.add_argument('-a', '--anki', required=False) ## path to anki media folder.  if set, copy images here
-  parser.add_argument('-w', '--working', required=False, default='./')
-  parser.add_argument('-o', '--overwrite', required=False, action='store_true')
+  parser.add_argument('-f', '--file', required=True, help='PDF file from DMV, or its poppler-converted XML file')
+  parser.add_argument('-v', '--vehicle', choices=['car','moto','mech'])
+  parser.add_argument('-s', '--signsrules', choices=['signs','rules'])
+  parser.add_argument('-l', '--language', choices=['english','chinese','vietnamese','khmer','japanese','indonesian','thai','burmese'])
+  parser.add_argument('-t', '--truechoice', choices=['true','choice'])
+  parser.add_argument('-a', '--anki', help='Path to anki media folder.  If set, copy images there')
+  parser.add_argument('-x', '--labelsfile', help='Labels file.  Set to empty string to skip applying labels', default=scriptDir+'/input/difficulty-labels.txt')
+  parser.add_argument('-w', '--working', default='./',help='Path where CSV and intermediate files will be written')
+  parser.add_argument('-o', '--overwrite', action='store_true', help='Recreate and overwrite CSV file even if it already exists.')
+  parser.add_argument('-d', '--dontdelete', action='store_true', help='Do not delete intermediate files after running.')
   args = parser.parse_args()
 
   filename = splitext(basename(args.file))
@@ -40,7 +41,8 @@ def main():
                        language=args.language,
                        vehicle=args.vehicle,
                        signsrules=args.signsrules,
-                       truechoice=args.truechoice)
+                       truechoice=args.truechoice,
+                       labelsfile=args.labelsfile)
 
   workingDir = args.working + '/' + qfile.getFileID()
   mkdir_p(workingDir)
@@ -136,10 +138,8 @@ def main():
   qfile.writeCSV(args.working)
   if args.anki:
     qfile.copyImages(workingDir, args.anki)
-
-
-
-
+  if not args.dontdelete:
+    rmtree(workingDir)
 
 def initializer(func):
   names, varargs, keywords, defaults = inspect.getargspec(func)
@@ -179,7 +179,7 @@ class QuestionFile(object):
             }
 
   @initializer
-  def __init__(self,filebase='',language='',vehicle='',signsrules='',truechoice='',questions=[],images=[]):
+  def __init__(self,filebase='',language='',vehicle='',signsrules='',truechoice='',questions=[],images=[],labelsfile=''):
     attributes_set = (language and vehicle and signsrules and truechoice)
     if attributes_set:
       pass
@@ -188,6 +188,14 @@ class QuestionFile(object):
     else:
       warning('qfile(): Must set all attributes or filebase.')
       sys.exit()
+    if labelsfile:
+      self.readLabels()
+  def readLabels(self):
+    self.labels = {}
+    with open(self.labelsfile) as f:
+      for line in f:
+        (id,tag)=line.rstrip().split()
+        self.labels[id] = tag
   def getFileID(self):
     return self.language+'-'+self.vehicle+'-'+self.signsrules+'-'+self.truechoice
   def newQuestion(self):
@@ -254,8 +262,16 @@ class question(object):
     pretty_question = self.question
     if self.qfile.truechoice == 'choice':
       pretty_question = re.sub(r'\( *([123]) *\)',r'<br>(\1) ',self.question)
-    row = [self.qfile.getFileID()+'-'+str(self.number).zfill(3),pretty_question,self.answer,self.category,
+    fillNum = str(self.number).zfill(3)
+    fileID_and_num = self.qfile.getFileID()+'-'+fillNum
+    row = [fileID_and_num,pretty_question,self.answer,self.category,
            self.qfile.language, self.qfile.vehicle, self.qfile.signsrules, self.qfile.truechoice]
+    anyID = fileID_and_num.replace(self.qfile.language,'any')
+    label = self.qfile.labels.get(fileID_and_num)
+    if not label:
+      label = self.qfile.labels.get(anyID)
+    if label:
+      row.append(label)
     return '\t'.join(row)
 
 def warning(*objs):
