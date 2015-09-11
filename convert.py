@@ -267,11 +267,10 @@ class question(object):
     row = [fileID_and_num,pretty_question,self.answer,self.category,
            self.qfile.language, self.qfile.vehicle, self.qfile.signsrules, self.qfile.truechoice]
     anyID = fileID_and_num.replace(self.qfile.language,'any')
-    label = self.qfile.labels.get(fileID_and_num)
+    label = self.qfile.labels.get(fileID_and_num,'')
     if not label:
-      label = self.qfile.labels.get(anyID)
-    if label:
-      row.append(label)
+      label = self.qfile.labels.get(anyID,'')
+    row.append(label)
     return '\t'.join(row)
 
 def warning(*objs):
