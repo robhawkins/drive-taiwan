@@ -178,15 +178,23 @@ class QuestionFile(object):
               'Signs-True or False／English(汽車標誌是非題-英文)' : ('car', 'signs', 'true', 'english'),
             }
 
+  for k in list(filemap):
+    v = filemap[k]
+    id=v[3]+'-'+v[0]+'-'+v[1]+'-'+v[2]
+    filemap[id] = v
+
   @initializer
   def __init__(self,filebase='',language='',vehicle='',signsrules='',truechoice='',questions=[],images=[],labelsfile=''):
     attributes_set = (language and vehicle and signsrules and truechoice)
     if attributes_set:
       pass
-    elif filemap[filebase]:
+    elif filebase in filemap:
       (self.vehicle, self.signsrules, self.truechoice, self.language) = filemap[filebase]
     else:
-      warning('qfile(): Must set all attributes or filebase.')
+      if filebase:
+        warning('Invalid filebase: '+filebase)
+      else:
+        warning('qfile(): Must set all attributes or filebase.')
       sys.exit()
     if labelsfile:
       self.readLabels()
