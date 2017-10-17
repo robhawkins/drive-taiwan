@@ -8,6 +8,7 @@ import glob
 import os,argparse,errno
 import csv
 import re
+import sys
 
 
 # This program prints questions in HTML format along with links and difficulty labels
@@ -231,7 +232,9 @@ def main():
               lookup = ref_base+'-'+str(int_num+1)
 
 
-        out_write(columns([str(i), refid, question,questionsOpp.get(lookup, ''),answer,diff[tags],signsrules,tf[truechoice],number,comments[qid]]), [out, out_simple])
+        out_write(columns([str(i), args.language+'-'+refid, question,questionsOpp.get(lookup, ''),
+                           answer,diff[tags],signsrules,tf[truechoice],number,comments[qid]]),
+                  [out, out_simple])
 
         out_write('</tr>', [out, out_simple])
   out_write('</tbody></table></body></html>', [out, out_simple])
@@ -253,7 +256,7 @@ def columns(cols, th=False):
 
 def out_write(string, dest):
   for d in dest:
-    d.write(string)
+    d.write(string+'\n')
 
 
 class question(object):
