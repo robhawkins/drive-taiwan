@@ -13,5 +13,5 @@ elif [[ "$OS" == "Darwin" ]] ; then
   nprocs=$(sysctl -n hw.ncpu)
 fi
 
-find "$DIR"/input/pdf/ -type f -name '*.pdf' | xargs -P${nprocs} -I, python3 convert.py -f , -w "$OUT" "$@"
+find "$DIR"/input/pdf/ -type f -name '*.pdf' | xargs -P${nprocs} -I, python3 -B "$DIR"/convert.py -f , -w "$OUT" "$@"
 

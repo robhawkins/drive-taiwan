@@ -12,6 +12,7 @@ import sys
 import re
 import glob
 import pdb
+import csv
 from natsort import natsorted
 
 ## This program converts Taiwan driver's test PDF files into csv for import as Anki flashcards. It can optionally copy images to Anki media folder
@@ -25,8 +26,8 @@ def main():
   parser.add_argument('-s', '--signsrules', choices=['signs','rules'])
   parser.add_argument('-l', '--language', choices=['english','chinese','vietnamese','khmer','japanese','indonesian','thai','burmese'])
   parser.add_argument('-t', '--truechoice', choices=['true','choice'])
-  parser.add_argument('-a', '--anki', help='Path to anki media folder.  If set, copy images there')
-  parser.add_argument('-x', '--labelsfile', help='Labels file.  Set to empty string to skip applying labels', default=scriptDir+'/input/difficulty-labels.txt')
+  parser.add_argument('-a', '--ankimedia', help='Path to anki media folder.  If set, copy images there')
+  parser.add_argument('-e', '--ankiexport', help='Anki export containing labels.  Set to empty string to skip applying labels', default=scriptDir+'/input/All Decks.txt')
   parser.add_argument('-w', '--working', default='./',help='Path where CSV and intermediate files will be written')
   parser.add_argument('-o', '--overwrite', action='store_true', help='Recreate and overwrite CSV file even if it already exists.')
   parser.add_argument('-d', '--dontdelete', action='store_true', help='Do not delete intermediate files after running.')
@@ -42,7 +43,7 @@ def main():
                        vehicle=args.vehicle,
                        signsrules=args.signsrules,
                        truechoice=args.truechoice,
-                       labelsfile=args.labelsfile)
+                       ankiexport=args.ankiexport)
 
   workingDir = args.working + '/' + qfile.getFileID()
   mkdir_p(workingDir)
@@ -54,7 +55,7 @@ def main():
   if ext == '.pdf':
     xmlfile = workingDir + '/' + base + '.xml'
     opts = ['pdftohtml', '-xml']
-    if not args.anki:
+    if not args.ankimedia:
       opts.append('-i')
     opts.extend([args.file, xmlfile])
     FNULL = open(os.devnull, 'w')
@@ -136,8 +137,8 @@ def main():
   filehandler.close()
 
   qfile.writeCSV(args.working)
-  if args.anki:
-    qfile.copyImages(workingDir, args.anki)
+  if args.ankimedia:
+    qfile.copyImages(workingDir, args.ankimedia)
   if not args.dontdelete:
     rmtree(workingDir)
 
@@ -157,6 +158,8 @@ def initializer(func):
 
   return wrapper
 
+## QuestionFile is used to build up an object and export to CSV.
+## There is currently no import function
 class QuestionFile(object):
   global filemap
   filemap = {
@@ -184,7 +187,7 @@ class QuestionFile(object):
     filemap[id] = v
 
   @initializer
-  def __init__(self,filebase='',language='',vehicle='',signsrules='',truechoice='',questions=[],images=[],labelsfile=''):
+  def __init__(self,filebase='',language='',vehicle='',signsrules='',truechoice='',questions=[],images=[],ankiexport=''):
     attributes_set = (language and vehicle and signsrules and truechoice)
     if attributes_set:
       pass
@@ -192,17 +195,20 @@ class QuestionFile(object):
       (self.vehicle, self.signsrules, self.truechoice, self.language) = filemap[filebase]
     else:
       if filebase:
-        warning('Invalid filebase: '+filebase)
+        #warning('Unsupported filebase: '+filebase)
+        pass
       else:
         warning('qfile(): Must set all attributes or filebase.')
       sys.exit()
-    if labelsfile:
+    if ankiexport:
       self.readLabels()
   def readLabels(self):
     self.labels = {}
-    with open(self.labelsfile) as f:
-      for line in f:
-        (id,tag)=line.rstrip().split()
+    with open(self.ankiexport) as f:
+      reader = csv.reader(f, delimiter='\t')
+      for line in reader:
+        id = line[0]
+        tag = line[-1]
         self.labels[id] = tag
   def getFileID(self):
     return self.language+'-'+self.vehicle+'-'+self.signsrules+'-'+self.truechoice
@@ -214,7 +220,7 @@ class QuestionFile(object):
     return self.questions[i]
   def prettyAll(self):
     self.finished()
-    return '\n'.join(q.pretty() for q in self.questions)
+    return '\n'.join(q.pretty() for q in self.questions)+'\n'
   def writeCSV(self, dir):
     file = dir + '/' + self.getFileID() + '.csv'
     f = open(file, 'w')
@@ -228,12 +234,12 @@ class QuestionFile(object):
     if self.signsrules == 'signs':
       self.populateImageNames()
       for i,q in enumerate(self.questions):
-        q.question = '<img src="'+self.images[i]+'"><br>'+q.question
+        q.question = '<img src="'+self.images[i]+'"/><br/>'+q.question
     self.finished_called = 1
   def copyImages(self, work, anki):
     if not self.finished_called:
       self.finished()
-    images = glob.glob(work + '/' + self.filebase + '*png')
+    images = [f for f in glob.glob(work + '/' + self.filebase + '*.*') if not re.match('.*\.xml', f)]
     for i,f in enumerate(natsorted(images)):
       copy2(f, anki + '/' + self.images[i])
   def populateImageNames(self):
@@ -269,15 +275,33 @@ class question(object):
       warning("pretty(): Number, question or answer not set before printing")
     pretty_question = self.question
     if self.qfile.truechoice == 'choice':
-      pretty_question = re.sub(r'\( *([123]) *\)',r'<br>(\1) ',self.question)
+      pretty_question = re.sub(r'\( *([123]) *\)',r'<br/>(\1) ',self.question)
+
+    num_matching = self.number
+    #The question # 165 that appears in the english test doesn't appear in the Chinese version.
+    # So, the english version is ahead by one number until the end (#633)
+    # 2 extra questions only appear in the Chinese version at the end of the file.
+
+    # This logic is replicated in produceHTML.py
+    if self.qfile.getFileID() == 'chinese-car-rules-true' and self.number >= 165:
+      num_matching += 1
+    fillNum_matching = str(num_matching).zfill(3)
+    fileID_and_num_matching = self.qfile.getFileID()+'-'+fillNum_matching
+
     fillNum = str(self.number).zfill(3)
     fileID_and_num = self.qfile.getFileID()+'-'+fillNum
     row = [fileID_and_num,pretty_question,self.answer,self.category,
            self.qfile.language, self.qfile.vehicle, self.qfile.signsrules, self.qfile.truechoice]
-    anyID = fileID_and_num.replace(self.qfile.language,'any')
-    label = self.qfile.labels.get(fileID_and_num,'')
-    if not label:
-      label = self.qfile.labels.get(anyID,'')
+    englishID = fileID_and_num_matching.replace(self.qfile.language,'english')
+    #anyID = fileID_and_num.replace(self.qfile.language,'any')
+
+    # Always overriding label with the one in the english set
+    label = self.qfile.labels.get(englishID,'')
+
+    #label = self.qfile.labels.get(fileID_and_num,'')
+    #if not label:
+
+      #label = self.qfile.labels.get(anyID,'')
     row.append(label)
     return '\t'.join(row)
 

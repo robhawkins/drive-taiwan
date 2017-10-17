@@ -9,15 +9,15 @@ import csv
 
 # This program finds questions that appear in both the car and moto driving test
 
-# Todo, if ever find dups: Load the difficulty-labels.txt file, copies the labels for any duplicate questions, and write a new difficulty-labels file
+# To do, if ever find dups: load Anki export file "All Decks.txt", copy labels from dups, apply them to the export, and import that to Anki
 
 def main():
   scriptDir=os.path.dirname(os.path.realpath(__file__))
   parser = argparse.ArgumentParser()
   parser.add_argument('-d', '--questionsdir', help='CSV question files directory (input).', default=scriptDir+'/expected-output/')
   parser.add_argument('-p', '--pairsfile', help='Duplicate questions file (output).', default=scriptDir+'/duplicate-questions.txt')
-  parser.add_argument('-i', '--inputlabels', help='Input labels file.', default=scriptDir+'/input/difficulty-labels.txt')
-  parser.add_argument('-o', '--outputlabels', help='Output labels file.', default=scriptDir+'/input/difficulty-labels-new.txt')
+#  parser.add_argument('-i', '--inputlabels', help='Input labels file (Anki export).', default=scriptDir+'/input/All Decks.txt')
+#  TO DO: Update code to work with this
   args = parser.parse_args()
 
   questionFiles = [join(args.questionsdir, f) for f in listdir(args.questionsdir) if isfile(join(args.questionsdir, f))]
